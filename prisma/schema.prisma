@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+//
+// ─── CORE MODELS ────────────────────────────────────────────────────────────────
+//
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt 
+
+  // Relations
+  profile      Profile?
+  workspaces   WorkspaceMember[]
+  notifications Notification[]
+  recentNotes   RecentNote[]
+
+  @@map("users")
+}
+
+model Profile {
+  id         String    @id @default(uuid())
+  username   String    @unique
+  userId     String    @unique
+  profilePic String?
+  dob        DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+  @@map("profiles")
+}
+
+model Workspace {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  slug        String   @unique  // URL-friendly identifier
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members WorkspaceMember[]
+  notes   Note[]
+  notifications Notification[]
+
+  @@index([slug])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  userId      String
+  workspaceId String
+  role        Role     @default(VIEWER)
+  joinedAt    DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, workspaceId])
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([role])
+
+  @@map("workspace_members")
+}
+
+model Note {
+  id          String   @id @default(uuid())
+  noteVersion Int      @default(1)
+  description String?  @default("")
+  title       String
+  content     String   @db.Text
+  workspaceId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recentInteractions RecentNote[]
+  notifications Notification[]      // <-- ADDED inverse relation
+
+  @@index([workspaceId])
+  @@index([updatedAt])
+  @@index([workspaceId, updatedAt])
+
+  @@map("notes")
+}
+//
+// ─── NEW MODELS ────────────────────────────────────────────────────────────────
+//
+
+/// Notifications (for invites, edits, etc.)
+model Notification {
+  id            String         @id @default(uuid())
+  type          NotificationType
+  message       String
+  isRead        Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+
+  // Optional references depending on context
+  userId        String?        // who receives the notification
+  workspaceId   String?        // workspace related to the notification
+  noteId        String?        // note related to the notification
+
+  // Relations
+  user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace     Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  note          Note?          @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([noteId])
+  @@index([type])
+  @@map("notifications")
+}
+
+/// Tracks recent notes a user interacted with
+model RecentNote {
+  id        String   @id @default(uuid())
+  userId    String
+  noteId    String
+  lastOpened DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, noteId]) // each user-note pair only once
+  @@index([userId])
+  @@index([noteId])
+  @@map("recent_notes")
+}
+
+//
+// ─── ENUMS ─────────────────────────────────────────────────────────────────────
+//
+
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum NotificationType {
+  INVITATION        // invited to a workspace
+  WORKSPACE_EDITED  // workspace metadata updated
+  NOTE_ADDED        // new note added in workspace
+  MEMBER_UPDATED    // member role or access changed
+}

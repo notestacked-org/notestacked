@@ -4,10 +4,17 @@ import { supabaseMiddleware, getSupabase } from "../../lib/supabase/supabaseMidd
 import { zValidator } from "@hono/zod-validator";
 
 
-export const auth = new Hono();
-
-auth.use("*", supabaseMiddleware());
-auth.post("/register", zValidator("json", registerSchema), async (c) => {
+export const auth = new Hono()
+.use("*", supabaseMiddleware())
+.get("/validate",async(c)=>{
+  const supabase= getSupabase(c);
+  const {data:{user}}=await supabase.auth.getUser();
+  if(user){
+    return c.json({success:true,user},200);
+  }
+  return c.json({success:false,user:null},401);
+})
+.post("/register", zValidator("json", registerSchema), async (c) => {
   const { email, password, username } = c.req.valid("json")
   const supabase = getSupabase(c);
   try {
@@ -21,9 +28,9 @@ auth.post("/register", zValidator("json", registerSchema), async (c) => {
       }
     });
     if (error) throw error;
-    return c.json({ message: "User registered successfully, please verify your email" }, 200);
+    return c.json({ message: "User registered successfully, please verify your email",success:true }, 200);
   } catch (error) {
-    return c.json({ message: (error as Error).message }, 400)
+    return c.json({ message: (error as Error).message,success:true }, 400)
   }
 })
   .post("/login", zValidator("json", loginSchema), async (c) => {
@@ -35,13 +42,13 @@ auth.post("/register", zValidator("json", registerSchema), async (c) => {
         password
       })
       if (error) throw error;
-      return c.json({ message: "User is logged in successfully" }, 200)
+      return c.json({ message: "User is logged in successfully",success:true }, 200)
 
     } catch (error) {
-      return c.json({ message: (error as Error).message }, 400)
+      return c.json({ message: (error as Error).message ,success:false}, 400)
     }
   })
-  .get("/logout", async (c) => {
+  .post("/logout", async (c) => {
 
     const supabase = getSupabase(c);
     try {

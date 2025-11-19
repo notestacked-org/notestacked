@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import '../styles/_variables.scss';
+@import '../styles/_keyframe-animations.scss';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -44,6 +46,8 @@
 }
 
 :root {
+  --shadow-float: 0 10px 20px -5px rgba(0,0,0,0.3);
+  --shadow-soft: 0 8px 50px -8px rgba(0,0,0,0.25);
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -110,6 +114,13 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+.shadow-float{
+  box-shadow: var(--shadow-float);
+}
+.shadow-soft{
+  box-shadow: var(--shadow-soft);
 }
 
 @layer base {
